@@ -10,7 +10,7 @@
 
 cd $HOME/tm/tmgp/model-trainer
 
-source $HOME/tm/tmgp/venv/bin/activate
+source $HOME/tm/venv/bin/activate
 
 pip install transformers[sentencepiece] datasets sacrebleu rouge_score py7zr -q
 pip uninstall transformers accelerate -y
