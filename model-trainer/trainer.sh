@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gpus=1
 #SBATCH --partition=gpu
-#SBATCH --time=10:00:00
+#SBATCH --time=30:00:00
 #SBATCH --output=pegasus-trainer.out
 #SBATCH -J spred2 
 
