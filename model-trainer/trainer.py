@@ -16,6 +16,18 @@ from transformers import (
 from datasets import load_dataset, load_metric
 import logging
 
+# Training arguments
+logging.info("Setting up training arguments")
+trainer_args = TrainingArguments(
+    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints'),
+    num_train_epochs=15, warmup_steps=500,
+    per_device_train_batch_size=1, per_device_eval_batch_size=1,
+    weight_decay=0.01, logging_steps=10,
+    evaluation_strategy='steps', eval_steps=500, save_steps=1e6,
+    gradient_accumulation_steps=16
+)
+logging.info(f"Training arguments: {trainer_args}")
+
 
 nltk.download("punkt")
 
@@ -120,14 +132,7 @@ def convert_examples_to_features(example_batch):
 dataset_samsum_pt = dataset_samsum.map(convert_examples_to_features, batched=True)
 seq2seq_data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_pegasus)
 
-# Training arguments
-trainer_args = TrainingArguments(
-    output_dir='/checkpoints', num_train_epochs=15, warmup_steps=500,
-    per_device_train_batch_size=1, per_device_eval_batch_size=1,
-    weight_decay=0.01, logging_steps=10,
-    evaluation_strategy='steps', eval_steps=500, save_steps=1e6,
-    gradient_accumulation_steps=16
-)
+
 
 # Trainer
 logging.info("Initialising trainer")
@@ -149,8 +154,8 @@ rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
 logging.info(pd.DataFrame(rouge_dict, index=[f'pegasus']))
 
 # Save model and tokenizer
-model_pegasus.save_pretrained("/checkpoints/pegasus-samsum-model")
-tokenizer.save_pretrained("/checkpoints/tokenizer")
+model_pegasus.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-model'))
+tokenizer.save_pretrained(os.path.expanduser('~/tm/checkpoints/tokenizer'))
 
 # Summarization with fine-tuned model
 sample_text = dataset_samsum["test"][0]["dialogue"]
