@@ -16,6 +16,14 @@ from transformers import (
 from datasets import load_dataset, load_metric
 import logging
 
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler('trainer.log'),
+                        logging.StreamHandler()
+                    ])
+
+
 # Training arguments
 logging.info("Setting up training arguments")
 trainer_args = TrainingArguments(
