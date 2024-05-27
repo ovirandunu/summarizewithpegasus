@@ -14,21 +14,22 @@ from transformers import (
     set_seed
 )
 from datasets import load_dataset, load_metric
-
-
+import logging
 
 
 nltk.download("punkt")
 
 # Check GPU availability
 device = "cuda" if torch.cuda.is_available() else "cpu"
+logging.info(f"Device set to {device}")
 
 # Load the Pegasus model and its tokenizer from HuggingFace
 model_ckpt = "google/pegasus-cnn_dailymail"
+logging.info(f"Loading model and tokenizer from checkpoint {model_ckpt}")
 tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
 model_pegasus = AutoModelForSeq2SeqLM.from_pretrained(model_ckpt).to(device)
+logging.info(f"Model loaded: {model_pegasus}")
 
-print(f"Device set to {device}")
 
 # Helper function to split data into batch-sized chunks
 def generate_batch_sized_chunks(list_of_elements, batch_size):
@@ -61,19 +62,20 @@ def calculate_metric_on_test_ds(dataset, metric, model, tokenizer, batch_size=8,
     return score
 
 # Load dataset
+logging.info("Loading samsum dataset")
 dataset_samsum = load_dataset("samsum")
-print(f"Split lengths: {[len(dataset_samsum[split]) for split in dataset_samsum]}")
-print(f"Features: {dataset_samsum['train'].column_names}")
-print("\nDialogue:")
-print(dataset_samsum["test"][1]["dialogue"])
-print("\nSummary:")
-print(dataset_samsum["test"][1]["summary"])
+logging.info(f"Split lengths: {[len(dataset_samsum[split]) for split in dataset_samsum]}")
+logging.info(f"Features: {dataset_samsum['train'].column_names}")
+logging.info("\nDialogue:")
+logging.info(dataset_samsum["test"][1]["dialogue"])
+logging.info("\nSummary:")
+logging.info(dataset_samsum["test"][1]["summary"])
 
 # Summarization pipeline
 pipe = pipeline('summarization', model=model_ckpt)
 pipe_out = pipe(dataset_samsum['test'][0]['dialogue'])
-print(pipe_out)
-print(pipe_out[0]['summary_text'].replace(" .", ".\n"))
+logging.info(pipe_out)
+logging.info(pipe_out[0]['summary_text'].replace(" .", ".\n"))
 
 # Calculate ROUGE scores
 rouge_metric = load_metric('rouge')
@@ -82,7 +84,7 @@ score = calculate_metric_on_test_ds(dataset_samsum['test'], rouge_metric, model_
 rouge_names = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
 rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
 dataframe_rouge = pd.DataFrame(rouge_dict, index=['pegasus'])
-print(dataframe_rouge)
+logging.info(dataframe_rouge)
 
 # Token length histograms
 dialogue_token_len = [len(tokenizer.encode(s)) for s in dataset_samsum['train']['dialogue']]
@@ -120,7 +122,7 @@ seq2seq_data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_pegasus)
 
 # Training arguments
 trainer_args = TrainingArguments(
-    output_dir='/checkpoints', num_train_epochs=10, warmup_steps=500,
+    output_dir='/checkpoints', num_train_epochs=15, warmup_steps=500,
     per_device_train_batch_size=1, per_device_eval_batch_size=1,
     weight_decay=0.01, logging_steps=10,
     evaluation_strategy='steps', eval_steps=500, save_steps=1e6,
@@ -128,12 +130,15 @@ trainer_args = TrainingArguments(
 )
 
 # Trainer
+logging.info("Initialising trainer")
 trainer = Trainer(model=model_pegasus, args=trainer_args,
                   tokenizer=tokenizer, data_collator=seq2seq_data_collator,
                   train_dataset=dataset_samsum_pt["train"],
                   eval_dataset=dataset_samsum_pt["validation"])
 
+logging.info("Starting training")
 trainer.train()
+logging.info("Training complete")
 
 # Calculate ROUGE scores after training
 score = calculate_metric_on_test_ds(
@@ -141,7 +146,7 @@ score = calculate_metric_on_test_ds(
 )
 
 rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
-print(pd.DataFrame(rouge_dict, index=[f'pegasus']))
+logging.info(pd.DataFrame(rouge_dict, index=[f'pegasus']))
 
 # Save model and tokenizer
 model_pegasus.save_pretrained("/checkpoints/pegasus-samsum-model")
@@ -153,9 +158,9 @@ reference = dataset_samsum["test"][0]["summary"]
 gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
 pipe = pipeline("summarization", model="/checkpoints/pegasus-samsum-model", tokenizer=tokenizer)
 
-print("Dialogue:")
-print(sample_text)
-print("\nReference Summary:")
-print(reference)
-print("\nModel Summary:")
-print(pipe(sample_text, **gen_kwargs)[0]["summary_text"])
+logging.info("Dialogue:")
+logging.info(sample_text)
+logging.info("\nReference Summary:")
+logging.info(reference)
+logging.info("\nModel Summary:")
+logging.info(pipe(sample_text, **gen_kwargs)[0]["summary_text"])
