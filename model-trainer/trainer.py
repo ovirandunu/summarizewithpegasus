@@ -162,18 +162,37 @@ rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
 logging.info(pd.DataFrame(rouge_dict, index=[f'pegasus']))
 
 # Save model and tokenizer
-model_pegasus.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-model'))
-tokenizer.save_pretrained(os.path.expanduser('~/tm/checkpoints/tokenizer'))
+try:
+    model_pegasus.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-model'))
+except Exception as e:
+    logging.error(f"Error saving model stage 1: {e}")
+
+# Save model and tokenizer
+try:
+    trainer.model.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-model'))
+    logging.info("Model saved successfully.")
+except Exception as e:
+    logging.error(f"Error saving model: {e}")
+
+try:
+    tokenizer.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-tokenizer'))
+    logging.info("Tokenizer saved successfully.")
+except Exception as e:
+    logging.error(f"Error saving tokenizer: {e}")
 
 # Summarization with fine-tuned model
 sample_text = dataset_samsum["test"][0]["dialogue"]
 reference = dataset_samsum["test"][0]["summary"]
 gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
-pipe = pipeline("summarization", model="/checkpoints/pegasus-samsum-model", tokenizer=tokenizer)
 
-logging.info("Dialogue:")
-logging.info(sample_text)
-logging.info("\nReference Summary:")
-logging.info(reference)
-logging.info("\nModel Summary:")
-logging.info(pipe(sample_text, **gen_kwargs)[0]["summary_text"])
+try:
+    pipe = pipeline("summarization", model=os.path.expanduser('~/tm/checkpoints/pegasus-samsum-model'), tokenizer=tokenizer)
+    model_summary = pipe(sample_text, **gen_kwargs)[0]["summary_text"]
+    logging.info("Dialogue:")
+    logging.info(sample_text)
+    logging.info("\nReference Summary:")
+    logging.info(reference)
+    logging.info("\nModel Summary:")
+    logging.info(model_summary)
+except Exception as e:
+    logging.error(f"Error during summarization: {e}")
