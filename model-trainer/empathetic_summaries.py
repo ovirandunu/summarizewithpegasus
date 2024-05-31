@@ -58,7 +58,7 @@ nltk.download("punkt")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info(f"Device set to {device}")
 
-# Load the SamSum-finetuned Pegasus model and its tokenizer from HuggingFace
+# Load the SamSum-finetuned Pegasus model and its tokenizer from checkpoints
 model_ckpt = os.path.expanduser('~/tm/checkpoints/pegasus-samsum-model')
 logging.info(f"Loading model and tokenizer from checkpoint {model_ckpt}")
 tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
@@ -135,6 +135,13 @@ axes[1].set_title("Summary Token Length")
 axes[1].set_xlabel("Length")
 plt.tight_layout()
 plt.show()
+
+# save plot to empathetic folder
+try:
+    plt.savefig('empathetic/token_histogram.png')
+except Exception as e:
+    logging.error(f"Error saving token histogram plot: {e}")
+
 
 # Convert examples to features
 def convert_examples_to_features(example_batch):
