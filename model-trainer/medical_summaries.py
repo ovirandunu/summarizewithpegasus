@@ -56,18 +56,20 @@ def download_parquet_files():
 # Training configurations
 logging.info("Setting up training arguments")
 trainer_args = TrainingArguments(
-    output_dir='/content/drive/MyDrive/model/checkpoints',
-    num_train_epochs=1,
+    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/medical'),
+    num_train_epochs=4,
     warmup_steps=500,
-    per_device_train_batch_size=1,
-    per_device_eval_batch_size=1,
+    per_device_train_batch_size=4,
+    per_device_eval_batch_size=4,
     weight_decay=0.01,
     logging_steps=10,
     evaluation_strategy='steps',
     eval_steps=500,
-    save_steps=500,
+    save_strategy='epoch',
     gradient_accumulation_steps=16
 )
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Load the Pegasus model and tokenizer
 model_ckpt = "/path/to/your/checkpoint"
@@ -80,9 +82,6 @@ def generate_batch_sized_chunks(list_of_elements, batch_size):
     """Yield successive batch-sized chunks from list_of_elements."""
     for i in range(0, len(list_of_elements), batch_size):
         yield list_of_elements[i: i + batch_size]
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = AutoModelForSeq2SeqLM.from_pretrained(model_ckpt).to(device)
 
 
 def calculate_metric_on_test_ds(dataset, rouge_metric, model, tokenizer, batch_size=2, column_text='dialogue', column_summary='soap'):
