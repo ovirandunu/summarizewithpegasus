@@ -176,7 +176,7 @@ logging.info(f"Training arguments: {trainer_args}")
 
 # Initialize trainer
 logging.info("Initializing trainer")
-trainer = Seq2SeqTrainer(
+trainer = Trainer(
     model=model_pegasus,
     args=trainer_args,
     tokenizer=tokenizer,

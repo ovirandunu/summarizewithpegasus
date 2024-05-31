@@ -38,15 +38,19 @@ logging.basicConfig(level=logging.INFO,
 
 logging.info("Setting up training arguments")
 trainer_args = TrainingArguments(
-    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints'),
-    num_train_epochs=15, warmup_steps=500,
-    per_device_train_batch_size=1, per_device_eval_batch_size=1,
-    weight_decay=0.01, logging_steps=10,
-    evaluation_strategy='steps', eval_steps=500, save_steps=1e6,
+    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/empathetic'),
+    num_train_epochs=4,
+    warmup_steps=500,
+    per_device_train_batch_size=4,
+    per_device_eval_batch_size=4,
+    weight_decay=0.01,
+    logging_steps=10,
+    evaluation_strategy='steps',
+    eval_steps=500,
+    save_strategy='epoch',
     gradient_accumulation_steps=16
 )
 logging.info(f"Training arguments: {trainer_args}")
-
 
 nltk.download("punkt")
 
