@@ -52,7 +52,8 @@ nltk.download("punkt")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info(f"Device set to {device}")
 
-# Load the SamSum-finetuned Pegasus model and its tokenizer from checkpoints
+# Load the relevant model
+# checkpoints available for this pipeline: google/pegasus-cnn_dailymail, ~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model-2
 model_ckpt = "google/pegasus-cnn_dailymail"
 logging.info(f"Loading model and tokenizer from checkpoint {model_ckpt}")
 tokenizer = AutoTokenizer.from_pretrained(model_ckpt)

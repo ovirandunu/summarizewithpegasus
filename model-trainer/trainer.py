@@ -167,13 +167,6 @@ try:
 except Exception as e:
     logging.error(f"Error saving model: {e}")
 
-
-# try:
-#     model_pegasus.save_pretrained(os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model'))
-# except Exception as e:
-#     logging.error(f"Error saving model stage 1: {e}")
-
-
 try:
     tokenizer.save_pretrained(os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-tokenizer'))
     logging.info("Tokenizer saved successfully.")
