@@ -191,3 +191,25 @@ except Exception as e:
     logging.error(f"Error during summarization: {e}")
 
 
+# Evaluate using ROUGE metric
+rouge_metric = evaluate.load('rouge', trust_remote_code=True)
+test_score = calculate_metric_on_test_ds(dataset['test'], rouge_metric, model, tokenizer, batch_size=2, column_text='dialogue', column_summary='soap')
+rouge_dict = {rn: test_score[rn].mid.fmeasure for rn in ['rouge1', 'rouge2', 'rougeL', 'rougeLsum']}
+dataframe_rouge = pd.DataFrame([rouge_dict], index=['Post-Training'])
+logging.info("ROUGE scores after training:\n" + str(dataframe_rouge))
+
+# Plot token length histograms
+dialogue_token_len = [len(tokenizer.encode(s)) for s in dataset['train']['dialogue']]
+summary_token_len = [len(tokenizer.encode(s)) for s in dataset['train']['soap']]
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+axes[0].hist(dialogue_token_len, bins=20, color='C0', edgecolor='C0')
+axes[0].set_title("Dialogue Token Length")
+axes[0].set_xlabel("Length")
+axes[0].set_ylabel("Count")
+axes[1].hist(summary_token_len, bins=20, color='C0', edgecolor='C0')
+axes[1].set_title("Summary Token Length")
+axes[1].set_xlabel("Length")
+plt.tight_layout()
+plt.show()
+
+
