@@ -5,36 +5,28 @@ from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
 from transformers import (
-    AutoModelForSeq2SeqLM, 
-    AutoTokenizer, 
-    DataCollatorForSeq2Seq, 
-    TrainingArguments, 
-    Trainer, 
-    pipeline, 
-    set_seed
+    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
+    DataCollatorForSeq2Seq,
+    TrainingArguments,
+    Trainer,
+    pipeline,
+    set_seed,
+    Seq2SeqTrainer,
+    Seq2SeqTrainingArguments,
 )
 from datasets import load_dataset, load_metric
+from transformers.trainer_callback import TrainerCallback
 import logging
 
+
+# Set up logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s',
                     handlers=[
                         logging.FileHandler('trainer.log'),
                         logging.StreamHandler()
                     ])
-
-
-# Training arguments
-logging.info("Setting up training arguments")
-trainer_args = TrainingArguments(
-    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints'),
-    num_train_epochs=15, warmup_steps=500,
-    per_device_train_batch_size=1, per_device_eval_batch_size=1,
-    weight_decay=0.01, logging_steps=10,
-    evaluation_strategy='steps', eval_steps=500, save_steps=1e6,
-    gradient_accumulation_steps=16
-)
-logging.info(f"Training arguments: {trainer_args}")
 
 
 nltk.download("punkt")
@@ -56,6 +48,7 @@ def generate_batch_sized_chunks(list_of_elements, batch_size):
     """Yield successive batch-sized chunks from list_of_elements."""
     for i in range(0, len(list_of_elements), batch_size):
         yield list_of_elements[i: i + batch_size]
+
 
 # Function to evaluate the summarization model on the test data
 def calculate_metric_on_test_ds(dataset, metric, model, tokenizer, batch_size=8, device=device, column_text="article", column_summary="highlights"):
@@ -80,6 +73,7 @@ def calculate_metric_on_test_ds(dataset, metric, model, tokenizer, batch_size=8,
 
     score = metric.compute()
     return score
+
 
 # Load dataset
 logging.info("Loading samsum dataset")
@@ -141,41 +135,72 @@ dataset_samsum_pt = dataset_samsum.map(convert_examples_to_features, batched=Tru
 seq2seq_data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_pegasus)
 
 
+# Custom callback for ROUGE evaluation
+class RougeCallback(TrainerCallback):
+    def __init__(self, rouge_metric, eval_dataset, tokenizer, device):
+        self.rouge_metric = rouge_metric
+        self.eval_dataset = eval_dataset
+        self.tokenizer = tokenizer
+        self.device = device
 
-# Trainer
-logging.info("Initialising trainer")
-trainer = Trainer(model=model_pegasus, args=trainer_args,
-                  tokenizer=tokenizer, data_collator=seq2seq_data_collator,
-                  train_dataset=dataset_samsum_pt["train"],
-                  eval_dataset=dataset_samsum_pt["validation"])
+    def on_evaluate(self, args, state, control, **kwargs):
+        trainer = kwargs['model']
+        score = calculate_metric_on_test_ds(
+            self.eval_dataset, self.rouge_metric, trainer, self.tokenizer, batch_size=8, device=self.device, column_text='dialogue', column_summary='summary'
+        )
+        rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
+        logging.info(f"ROUGE scores after epoch {state.epoch}: {rouge_dict}")
+
+
+# Training arguments
+logging.info("Setting up training arguments")
+trainer_args = Seq2SeqTrainingArguments(
+    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints'),
+    num_train_epochs=9,
+    warmup_steps=500,
+    per_device_train_batch_size=10,
+    per_device_eval_batch_size=10,
+    weight_decay=0.01,
+    logging_steps=10,
+    evaluation_strategy='epoch',
+    save_total_limit=3,
+    gradient_accumulation_steps=16,
+)
+
+logging.info(f"Training arguments: {trainer_args}")
+
+# Initialize trainer
+logging.info("Initializing trainer")
+trainer = Seq2SeqTrainer(
+    model=model_pegasus,
+    args=trainer_args,
+    tokenizer=tokenizer,
+    data_collator=seq2seq_data_collator,
+    train_dataset=dataset_samsum_pt["train"],
+    eval_dataset=dataset_samsum_pt["validation"],
+    callbacks=[RougeCallback(rouge_metric, dataset_samsum['test'], tokenizer, device)]
+)
 
 logging.info("Starting training")
 trainer.train()
 logging.info("Training complete")
 
-# Calculate ROUGE scores after training
-score = calculate_metric_on_test_ds(
-    dataset_samsum['test'], rouge_metric, trainer.model, tokenizer, batch_size=2, column_text='dialogue', column_summary='summary'
-)
-
-rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
-logging.info(pd.DataFrame(rouge_dict, index=[f'pegasus']))
-
 # Save model and tokenizer
 try:
-    model_pegasus.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-model'))
-except Exception as e:
-    logging.error(f"Error saving model stage 1: {e}")
-
-# Save model and tokenizer
-try:
-    trainer.model.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-model'))
+    trainer.model.save_pretrained(os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model-2'))
     logging.info("Model saved successfully.")
 except Exception as e:
     logging.error(f"Error saving model: {e}")
 
+
 try:
-    tokenizer.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-tokenizer'))
+    model_pegasus.save_pretrained(os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model'))
+except Exception as e:
+    logging.error(f"Error saving model stage 1: {e}")
+
+
+try:
+    tokenizer.save_pretrained(os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-tokenizer'))
     logging.info("Tokenizer saved successfully.")
 except Exception as e:
     logging.error(f"Error saving tokenizer: {e}")
