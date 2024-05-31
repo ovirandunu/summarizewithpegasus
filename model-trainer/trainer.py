@@ -158,7 +158,7 @@ class RougeCallback(TrainerCallback):
 logging.info("Setting up training arguments")
 trainer_args = TrainingArguments(
     output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints'),
-    num_train_epochs=9,
+    num_train_epochs=6,
     warmup_steps=500,
     per_device_train_batch_size=4,
     per_device_eval_batch_size=4,

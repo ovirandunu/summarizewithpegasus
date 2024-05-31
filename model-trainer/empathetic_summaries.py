@@ -182,19 +182,19 @@ logging.info(pd.DataFrame(rouge_dict, index=[f'pegasus']))
 
 # Save model and tokenizer
 try:
-    model_pegasus.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-empathic-model'))
+    model_pegasus.save_pretrained(os.path.expanduser('~/tm/empathetic/tmgp/model-trainer/empathetic/model-2/model-2'))
 except Exception as e:
     logging.error(f"Error saving model stage 1: {e}")
 
 # Save model and tokenizer
 try:
-    trainer.model.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-empathic-model'))
+    trainer.model.save_pretrained(os.path.expanduser('~/tm/empathetic/tmgp/model-trainer/empathetic/model-1'))
     logging.info("Model saved successfully after empathic finetuning.")
 except Exception as e:
     logging.error(f"Error saving model: {e}")
 
 try:
-    tokenizer.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-empathic-tokenizer'))
+    tokenizer.save_pretrained(os.path.expanduser('~/tm/empathetic/tmgp/model-trainer/empathetic/tokenizer'))
     logging.info("Tokenizer saved successfully after empathic finetuning.")
 except Exception as e:
     logging.error(f"Error saving tokenizer: {e}")
@@ -205,7 +205,7 @@ reference = dataset_empathic["test"][0]["summary"]
 gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
 
 try:
-    pipe = pipeline("summarization", model=os.path.expanduser('~/tm/checkpoints/pegasus-samsum-empathic-model'), tokenizer=tokenizer)
+    pipe = pipeline("summarization", model=os.path.expanduser('~/tm/empathetic/tmgp/model-trainer/empathetic/model-1'), tokenizer=tokenizer)
     model_summary = pipe(sample_text, **gen_kwargs)[0]["summary_text"]
     logging.info("Utterance:")
     logging.info(sample_text)
