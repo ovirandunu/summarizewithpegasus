@@ -1,3 +1,7 @@
+import torch
+import tqdm
+
+
 # Helper function to split data into batch-sized chunks
 def generate_batch_sized_chunks(list_of_elements, batch_size):
     """Yield successive batch-sized chunks from list_of_elements."""
@@ -5,7 +9,7 @@ def generate_batch_sized_chunks(list_of_elements, batch_size):
         yield list_of_elements[i: i + batch_size]
 
 # Function to evaluate the summarization model on the test data
-def calculate_metric_on_test_ds(dataset, metric, model, tokenizer, batch_size=8, device=device, column_text="utterance", column_summary="summary"):
+def calculate_metric_on_test_ds(dataset, metric, model, tokenizer, batch_size=8, device='cuda', column_text="utterance", column_summary="summary"):
     model.eval()
     article_batches = list(generate_batch_sized_chunks(dataset[column_text], batch_size))
     target_batches = list(generate_batch_sized_chunks(dataset[column_summary], batch_size))
