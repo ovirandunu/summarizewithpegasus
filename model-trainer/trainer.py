@@ -164,6 +164,7 @@ trainer_args = TrainingArguments(
     per_device_eval_batch_size=4,
     weight_decay=0.01,
     logging_steps=10,
+    eval_steps=500,
     evaluation_strategy='steps',
     save_strategy='epoch',
     # save_total_limit=3,

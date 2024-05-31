@@ -25,6 +25,7 @@ from transformers import (
 )
 from datasets import load_dataset, load_metric
 import logging
+from trainer import RougeCallback
 
 # Setup logging
 logging.basicConfig(level=logging.INFO,
@@ -38,7 +39,7 @@ logging.basicConfig(level=logging.INFO,
 
 logging.info("Setting up training arguments")
 trainer_args = TrainingArguments(
-    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/empathetic'),
+    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/financial'),
     num_train_epochs=4,
     warmup_steps=500,
     per_device_train_batch_size=4,
@@ -96,25 +97,25 @@ def calculate_metric_on_test_ds(dataset, metric, model, tokenizer, batch_size=8,
     return score
 
 # Load dataset
-logging.info("Loading empathetic_dialogues_summary dataset")
-dataset_empathic = load_dataset("jtatman/empathetic_dialogues_summary")
-logging.info(f"Split lengths: {[len(dataset_empathic[split]) for split in dataset_empathic]}")
-logging.info(f"Features: {dataset_empathic['train'].column_names}")
+logging.info("Loading npc_dialogues_summary dataset")
+dataset_financial = load_dataset("npc-engine/light-batch-summarize-dialogue")
+logging.info(f"Split lengths: {[len(dataset_financial[split]) for split in dataset_financial]}")
+logging.info(f"Features: {dataset_financial['train'].column_names}")
 # Logging a sample utterance and summary
 logging.info("\nUtterance:")
-logging.info(dataset_empathic["test"][1]["utterance"])
+logging.info(dataset_financial["test"][1]["dialogue_text"])
 logging.info("\nSummary:")
-logging.info(dataset_empathic["test"][1]["summary"])
+logging.info(dataset_financial["test"][1]["t0pp_prediction"])
 
 # Summarization pipeline
 pipe = pipeline('summarization', model=model_ckpt)
-pipe_out = pipe(dataset_empathic['test'][0]['utterance'])
+pipe_out = pipe(dataset_financial['test'][0]['dialogue_text'])
 logging.info(pipe_out)
 logging.info(pipe_out[0]['summary_text'].replace(" .", ".\n"))
 
 # Calculate ROUGE scores
 rouge_metric = load_metric('rouge')
-score = calculate_metric_on_test_ds(dataset_empathic['test'], rouge_metric, model_pegasus, tokenizer, column_text='utterance', column_summary='summary', batch_size=8)
+score = calculate_metric_on_test_ds(dataset_financial['test'], rouge_metric, model_pegasus, tokenizer, column_text='dialogue_text', column_summary="t0pp_prediction", batch_size=8)
 
 rouge_names = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
 rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
@@ -122,8 +123,8 @@ dataframe_rouge = pd.DataFrame(rouge_dict, index=['pegasus'])
 logging.info(dataframe_rouge)
 
 # Token length histograms
-utterance_token_len = [len(tokenizer.encode(s)) for s in dataset_empathic['train']['utterance']]
-summary_token_len = [len(tokenizer.encode(s)) for s in dataset_empathic['train']['summary']]
+utterance_token_len = [len(tokenizer.encode(s)) for s in dataset_financial['train']['dialogue_text']]
+summary_token_len = [len(tokenizer.encode(s)) for s in dataset_financial['train']["t0pp_prediction"]]
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 axes[0].hist(utterance_token_len, bins=20, color='C0', edgecolor='C0')
@@ -145,10 +146,10 @@ except Exception as e:
 
 # Convert examples to features
 def convert_examples_to_features(example_batch):
-    input_encodings = tokenizer(example_batch['utterance'], max_length=1024, truncation=True)
+    input_encodings = tokenizer(example_batch['dialogue_text'], max_length=1024, truncation=True)
 
     with tokenizer.as_target_tokenizer():
-        target_encodings = tokenizer(example_batch['summary'], max_length=128, truncation=True)
+        target_encodings = tokenizer(example_batch["t0pp_prediction"], max_length=128, truncation=True)
 
     target_encodings['labels'] = target_encodings['input_ids'].copy()
     target_encodings['input_ids'] = [[tokenizer.pad_token_id] + ids[:-1] for ids in target_encodings['input_ids']]
@@ -159,15 +160,17 @@ def convert_examples_to_features(example_batch):
         'labels': target_encodings['input_ids']
     }
 
-dataset_empathic_pt = dataset_empathic.map(convert_examples_to_features, batched=True)
+dataset_financial_pt = dataset_financial.map(convert_examples_to_features, batched=True)
 seq2seq_data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_pegasus)
 
 # Trainer
 logging.info("Initialising trainer")
 trainer = Trainer(model=model_pegasus, args=trainer_args,
                   tokenizer=tokenizer, data_collator=seq2seq_data_collator,
-                  train_dataset=dataset_empathic_pt["train"],
-                  eval_dataset=dataset_empathic_pt["validation"])
+                  train_dataset=dataset_financial_pt["train"],
+                  eval_dataset=dataset_financial_pt["validation"],
+                  callbacks=[RougeCallback(rouge_metric, dataset_financial['test'], tokenizer, device)])
+                  
 
 logging.info("Starting training on the empathic dataset")
 trainer.train()
@@ -175,33 +178,33 @@ logging.info("Training complete on the empathic dataset")
 
 # Calculate ROUGE scores after training
 score = calculate_metric_on_test_ds(
-    dataset_empathic['test'], rouge_metric, trainer.model, tokenizer, batch_size=2, column_text='utterance', column_summary='summary'
+    dataset_financial['test'], rouge_metric, trainer.model, tokenizer, batch_size=2, column_text='dialogue_text', column_summary="t0pp_prediction"
 )
 rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
 logging.info(pd.DataFrame(rouge_dict, index=[f'pegasus']))
 
 # Save model and tokenizer
 try:
-    model_pegasus.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-empathic-model'))
+    model_pegasus.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-npc-model'))
 except Exception as e:
     logging.error(f"Error saving model stage 1: {e}")
 
 # Save model and tokenizer
 try:
-    trainer.model.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-empathic-model'))
+    trainer.model.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-npc-model-2'))
     logging.info("Model saved successfully after empathic finetuning.")
 except Exception as e:
     logging.error(f"Error saving model: {e}")
 
 try:
-    tokenizer.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-empathic-tokenizer'))
+    tokenizer.save_pretrained(os.path.expanduser('~/tm/checkpoints/pegasus-samsum-npc-tokenizer'))
     logging.info("Tokenizer saved successfully after empathic finetuning.")
 except Exception as e:
     logging.error(f"Error saving tokenizer: {e}")
 
 # Summarization with fine-tuned model
-sample_text = dataset_empathic["test"][0]["utterance"]
-reference = dataset_empathic["test"][0]["summary"]
+sample_text = dataset_financial["test"][0]["utterance"]
+reference = dataset_financial["test"][0]["summary"]
 gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
 
 try:
@@ -215,3 +218,5 @@ try:
     logging.info(model_summary)
 except Exception as e:
     logging.error(f"Error during summarization: {e}")
+
+
