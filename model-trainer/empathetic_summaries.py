@@ -59,7 +59,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info(f"Device set to {device}")
 
 # Load the SamSum-finetuned Pegasus model and its tokenizer from checkpoints
-model_ckpt = os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model')
+model_ckpt = "google/pegasus-cnn_dailymail"
 logging.info(f"Loading model and tokenizer from checkpoint {model_ckpt}")
 tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
 model_pegasus = AutoModelForSeq2SeqLM.from_pretrained(model_ckpt).to(device)
