@@ -15,5 +15,6 @@ source $HOME/tm/venv/bin/activate
 pip install transformers[sentencepiece] datasets sacrebleu rouge_score py7zr -q
 pip uninstall transformers accelerate -y
 pip install transformers[torch] accelerate -U
+pip install scikit-learn
 
 python empathetic_summaries.py
