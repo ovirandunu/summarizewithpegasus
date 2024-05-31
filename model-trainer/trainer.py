@@ -157,9 +157,9 @@ logging.info("Setting up training arguments")
 trainer_args = Seq2SeqTrainingArguments(
     output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints'),
     num_train_epochs=9,
-    warmup_steps=500,
-    per_device_train_batch_size=1,
-    per_device_eval_batch_size=1,
+    warmup_steps=400,
+    per_device_train_batch_size=3,
+    per_device_eval_batch_size=3,
     weight_decay=0.01,
     logging_steps=10,
     evaluation_strategy='epoch',
