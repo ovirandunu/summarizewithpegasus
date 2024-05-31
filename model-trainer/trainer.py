@@ -114,6 +114,8 @@ axes[1].set_title("Summary Token Length")
 axes[1].set_xlabel("Length")
 plt.tight_layout()
 plt.show()
+# save to checkpoints folder
+plt.savefig('checkpoints/token_histogram.png')
 
 # Convert examples to features
 def convert_examples_to_features(example_batch):
@@ -154,18 +156,21 @@ class RougeCallback(TrainerCallback):
 
 # Training arguments
 logging.info("Setting up training arguments")
-trainer_args = Seq2SeqTrainingArguments(
+trainer_args = TrainingArguments(
     output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints'),
     num_train_epochs=9,
-    warmup_steps=400,
-    per_device_train_batch_size=3,
-    per_device_eval_batch_size=3,
+    warmup_steps=500,
+    per_device_train_batch_size=4,
+    per_device_eval_batch_size=4,
     weight_decay=0.01,
     logging_steps=10,
-    evaluation_strategy='epoch',
-    save_total_limit=3,
+    evaluation_strategy='steps',
+    save_strategy='epoch',
+    # save_total_limit=3,
     gradient_accumulation_steps=16,
 )
+
+# Specifiying the training arguments for the model.
 
 logging.info(f"Training arguments: {trainer_args}")
 
@@ -193,10 +198,10 @@ except Exception as e:
     logging.error(f"Error saving model: {e}")
 
 
-try:
-    model_pegasus.save_pretrained(os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model'))
-except Exception as e:
-    logging.error(f"Error saving model stage 1: {e}")
+# try:
+#     model_pegasus.save_pretrained(os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model'))
+# except Exception as e:
+#     logging.error(f"Error saving model stage 1: {e}")
 
 
 try:
@@ -211,7 +216,7 @@ reference = dataset_samsum["test"][0]["summary"]
 gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
 
 try:
-    pipe = pipeline("summarization", model=os.path.expanduser('~/tm/checkpoints/pegasus-samsum-model'), tokenizer=tokenizer)
+    pipe = pipeline("summarization", model=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model-2'), tokenizer=tokenizer)
     model_summary = pipe(sample_text, **gen_kwargs)[0]["summary_text"]
     logging.info("Dialogue:")
     logging.info(sample_text)
@@ -221,3 +226,17 @@ try:
     logging.info(model_summary)
 except Exception as e:
     logging.error(f"Error during summarization: {e}")
+
+
+from checkpoint_summarizer import generate_summaries_for_checkpoints
+
+# Sample text and generation parameters
+sample_text = dataset_samsum["test"][0]["dialogue"]
+gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
+
+# Directory where checkpoints are saved
+checkpoint_dir = os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints')
+
+# Generate summaries for each checkpoint and save to file
+generate_summaries_for_checkpoints(checkpoint_dir, sample_text, gen_kwargs)
+
