@@ -29,14 +29,14 @@ logging.basicConfig(level=logging.INFO,
                         logging.StreamHandler()
                     ])
 
-
+# download nltk punkt for tokenization
 nltk.download("punkt")
 
-# Check GPU availability
+# Check GPU availability and assign device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info(f"Device set to {device}")
 
-# Load the Pegasus model and its tokenizer from HuggingFace
+# Load the Pegasus model and its tokenizer from HuggingFace. (In the second stage, we load the model from the checkpoint instead.)
 model_ckpt = "google/pegasus-cnn_dailymail"
 logging.info(f"Loading model and tokenizer from checkpoint {model_ckpt}")
 tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
@@ -54,37 +54,22 @@ logging.info(dataset_samsum["test"][1]["dialogue"])
 logging.info("\nSummary:")
 logging.info(dataset_samsum["test"][1]["summary"])
 
-# Summarization pipeline
+# Summarization pipeline - baseline model inference
 pipe = pipeline('summarization', model=model_ckpt)
 pipe_out = pipe(dataset_samsum['test'][0]['dialogue'])
 logging.info(pipe_out)
 logging.info(pipe_out[0]['summary_text'].replace(" .", ".\n"))
 
-# Calculate ROUGE scores
+# Calculate ROUGE scores for baseline model
 rouge_metric = load_metric('rouge')
 score = calculate_metric_on_test_ds(dataset_samsum['test'], rouge_metric, model_pegasus, tokenizer, column_text='dialogue', column_summary='summary', batch_size=8)
 
+# Assign rouge scores to dataframe for organization and display
 rouge_names = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
 rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
 dataframe_rouge = pd.DataFrame(rouge_dict, index=['pegasus'])
-logging.info(dataframe_rouge)
+logging.info(f"ROUGE scores for baseline model: {dataframe_rouge}")
 
-# Token length histograms
-dialogue_token_len = [len(tokenizer.encode(s)) for s in dataset_samsum['train']['dialogue']]
-summary_token_len = [len(tokenizer.encode(s)) for s in dataset_samsum['train']['summary']]
-
-fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-axes[0].hist(dialogue_token_len, bins=20, color='C0', edgecolor='C0')
-axes[0].set_title("Dialogue Token Length")
-axes[0].set_xlabel("Length")
-axes[0].set_ylabel("Count")
-axes[1].hist(summary_token_len, bins=20, color='C0', edgecolor='C0')
-axes[1].set_title("Summary Token Length")
-axes[1].set_xlabel("Length")
-plt.tight_layout()
-plt.show()
-# save to checkpoints folder
-plt.savefig('checkpoints/token_histogram.png')
 
 # Convert examples to features
 def convert_examples_to_features(example_batch):
@@ -102,11 +87,14 @@ def convert_examples_to_features(example_batch):
         'labels': target_encodings['input_ids']
     }
 
+# Tokenize and encode the dataset
 dataset_samsum_pt = dataset_samsum.map(convert_examples_to_features, batched=True)
 seq2seq_data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_pegasus)
 
 
-# Custom callback for ROUGE evaluation
+# Custom callback for ROUGE evaluation during training - 
+# each dataset has a different column name for the text and summary, 
+# hence the need for a unique callback for each pipeline
 class RougeCallback(TrainerCallback):
     def __init__(self, rouge_metric, eval_dataset, tokenizer, device):
         self.rouge_metric = rouge_metric
@@ -126,21 +114,28 @@ class RougeCallback(TrainerCallback):
 # Training arguments
 logging.info("Setting up training arguments")
 trainer_args = TrainingArguments(
+    # directory for saving checkpoints
     output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints'),
+    # total number of training epochs
     num_train_epochs=6,
+    # number of warmup steps for learning rate scheduler
     warmup_steps=500,
+    # batch size for training
     per_device_train_batch_size=4,
+    # batch size for evaluation
     per_device_eval_batch_size=4,
+    # decay rate for learning rate
     weight_decay=0.01,
-    logging_steps=10,
+    # evaluate at every 500 steps
     eval_steps=500,
     evaluation_strategy='steps',
+    # save at every epoch
     save_strategy='epoch',
-    # save_total_limit=3,
+    # optimize gpu memory usage with gradient accumulation
     gradient_accumulation_steps=16,
 )
 
-# Specifiying the training arguments for the model.
+# Log the training arguments for the model.
 
 logging.info(f"Training arguments: {trainer_args}")
 
@@ -160,6 +155,9 @@ logging.info("Starting training")
 trainer.train()
 logging.info("Training complete")
 
+# Calculate ROUGE scores after training
+score = calculate_metric_on_test_ds(dataset_samsum['test'], rouge_metric, trainer.model, tokenizer, column_text='dialogue', column_summary='summary', batch_size=8)
+
 # Save model and tokenizer
 try:
     trainer.model.save_pretrained(os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model-2'))
@@ -173,7 +171,7 @@ try:
 except Exception as e:
     logging.error(f"Error saving tokenizer: {e}")
 
-# Summarization with fine-tuned model
+# Inference pipeline with trained model
 sample_text = dataset_samsum["test"][0]["dialogue"]
 reference = dataset_samsum["test"][0]["summary"]
 gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
@@ -191,6 +189,7 @@ except Exception as e:
     logging.error(f"Error during summarization: {e}")
 
 
+# use reusable function to generate summaries for each checkpoint
 from checkpoint_summarizer import generate_summaries_for_checkpoints
 
 # Sample text and generation parameters

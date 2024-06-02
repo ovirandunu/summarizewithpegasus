@@ -10,6 +10,21 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def summarize_with_checkpoint(checkpoint_path, sample_text, gen_kwargs):
+    """
+    Summarizes the given `sample_text` using a pre-trained model checkpoint located at `checkpoint_path`.
+
+    Args:
+        checkpoint_path (str): The path to the pre-trained model checkpoint.
+        sample_text (str): The text to be summarized.
+        gen_kwargs (dict): Additional keyword arguments to be passed to the summarization pipeline.
+
+    Returns:
+        str: The summarized text.
+
+    Raises:
+        Exception: If there is an error while summarizing with the checkpoint.
+
+    """
     try:
         logging.info(f"Loading model from {checkpoint_path}")
         model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_path).to(device)
@@ -22,6 +37,21 @@ def summarize_with_checkpoint(checkpoint_path, sample_text, gen_kwargs):
         return None
 
 def generate_summaries_for_checkpoints(checkpoint_dir, sample_text, gen_kwargs, output_file='summaries.txt'):
+    """
+    Generates summaries for checkpoints.
+
+    Args:
+        checkpoint_dir (str): The directory containing the checkpoints.
+        sample_text (str): The sample text to generate summaries for.
+        gen_kwargs (dict): Additional keyword arguments to pass to the summarize_with_checkpoint function.
+        output_file (str, optional): The name of the output file to save the summaries. Defaults to 'summaries.txt'.
+
+    Raises:
+        Exception: If there is an error generating the summaries.
+
+    Returns:
+        None
+    """
     try:
         checkpoint_paths = sorted(glob.glob(f"{checkpoint_dir}/checkpoint-*"))
         summaries = {}

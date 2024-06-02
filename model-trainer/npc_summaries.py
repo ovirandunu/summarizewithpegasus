@@ -28,27 +28,11 @@ logging.basicConfig(level=logging.INFO,
                         logging.StreamHandler()
                     ])
 
-# Training arguments
 
-logging.info("Setting up training arguments")
-trainer_args = TrainingArguments(
-    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/financial'),
-    num_train_epochs=4,
-    warmup_steps=500,
-    per_device_train_batch_size=4,
-    per_device_eval_batch_size=4,
-    weight_decay=0.01,
-    logging_steps=10,
-    evaluation_strategy='steps',
-    eval_steps=500,
-    save_strategy='epoch',
-    gradient_accumulation_steps=16
-)
-logging.info(f"Training arguments: {trainer_args}")
-
+# download nltk punkt for tokenization
 nltk.download("punkt")
 
-# Check GPU availability
+# Check GPU availability and assign device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info(f"Device set to {device}")
 
@@ -63,53 +47,33 @@ logging.info(f"Model loaded: {model_pegasus}")
 
 # Load dataset
 logging.info("Loading npc_dialogues_summary dataset")
-dataset_financial = load_dataset("npc-engine/light-batch-summarize-dialogue")
-logging.info(f"Split lengths: {[len(dataset_financial[split]) for split in dataset_financial]}")
-logging.info(f"Features: {dataset_financial['train'].column_names}")
+dataset_npc = load_dataset("npc-engine/light-batch-summarize-dialogue")
+logging.info(f"Split lengths: {[len(dataset_npc[split]) for split in dataset_npc]}")
+logging.info(f"Features: {dataset_npc['train'].column_names}")
 # Logging a sample utterance and summary
 logging.info("\nUtterance:")
-logging.info(dataset_financial["test"][1]["dialogue_text"])
+logging.info(dataset_npc["test"][1]["dialogue_text"])
 logging.info("\nSummary:")
-logging.info(dataset_financial["test"][1]["t0pp_prediction"])
+logging.info(dataset_npc["test"][1]["t0pp_prediction"])
 
-# Summarization pipeline
+# Summarization pipeline - baseline model inference
 pipe = pipeline('summarization', model=model_ckpt)
-pipe_out = pipe(dataset_financial['test'][0]['dialogue_text'])
+pipe_out = pipe(dataset_npc['test'][0]['dialogue_text'])
 logging.info(pipe_out)
 logging.info(pipe_out[0]['summary_text'].replace(" .", ".\n"))
 
-# Calculate ROUGE scores
+# Calculate ROUGE scores for baseline model
 rouge_metric = load_metric('rouge')
-score = calculate_metric_on_test_ds(dataset_financial['test'], rouge_metric, model_pegasus, tokenizer, column_text='dialogue_text', column_summary="t0pp_prediction", batch_size=8)
+score = calculate_metric_on_test_ds(dataset_npc['test'], rouge_metric, model_pegasus, tokenizer, column_text='dialogue_text', column_summary="t0pp_prediction", batch_size=8)
 
+# Assign ROUGE scores to a dataframe for organization and display
 rouge_names = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
 rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
 dataframe_rouge = pd.DataFrame(rouge_dict, index=['pegasus'])
 logging.info(dataframe_rouge)
 
-# Token length histograms
-utterance_token_len = [len(tokenizer.encode(s)) for s in dataset_financial['train']['dialogue_text']]
-summary_token_len = [len(tokenizer.encode(s)) for s in dataset_financial['train']["t0pp_prediction"]]
 
-fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-axes[0].hist(utterance_token_len, bins=20, color='C0', edgecolor='C0')
-axes[0].set_title("Utterance Token Length")
-axes[0].set_xlabel("Length")
-axes[0].set_ylabel("Count")
-axes[1].hist(summary_token_len, bins=20, color='C0', edgecolor='C0')
-axes[1].set_title("Summary Token Length")
-axes[1].set_xlabel("Length")
-plt.tight_layout()
-plt.show()
-
-# save plot to empathetic folder
-try:
-    plt.savefig('empathetic/token_histogram.png')
-except Exception as e:
-    logging.error(f"Error saving token histogram plot: {e}")
-
-
-# Convert examples to features
+# Convert examples to features - unique functions needed due to the nature of the dataset
 def convert_examples_to_features(example_batch):
     input_encodings = tokenizer(example_batch['dialogue_text'], max_length=1024, truncation=True)
 
@@ -125,16 +89,42 @@ def convert_examples_to_features(example_batch):
         'labels': target_encodings['input_ids']
     }
 
-dataset_financial_pt = dataset_financial.map(convert_examples_to_features, batched=True)
+# tokenizing and encoding the dataset
+dataset_npc_pt = dataset_npc.map(convert_examples_to_features, batched=True)
 seq2seq_data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_pegasus)
+
+# Training arguments
+logging.info("Setting up training arguments")
+trainer_args = TrainingArguments(
+    # directory for saving checkpoints
+    output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/financial'),
+    # total number of training epochs
+    num_train_epochs=6,
+    # number of warmup steps for learning rate scheduler
+    warmup_steps=500,
+    # batch size for training
+    per_device_train_batch_size=4,
+    # batch size for evaluation
+    per_device_eval_batch_size=4,
+    # decay rate for learning rate
+    weight_decay=0.01,
+    # evaluate at every 500 steps
+    eval_steps=500,
+    evaluation_strategy='steps',
+    # save at every epoch
+    save_strategy='epoch',
+    # optimize gpu memory usage with gradient accumulation
+    gradient_accumulation_steps=16,
+)
+logging.info(f"Training arguments: {trainer_args}")
 
 # Trainer
 logging.info("Initialising trainer")
 trainer = Trainer(model=model_pegasus, args=trainer_args,
                   tokenizer=tokenizer, data_collator=seq2seq_data_collator,
-                  train_dataset=dataset_financial_pt["train"],
-                  eval_dataset=dataset_financial_pt["validation"],
-                  callbacks=[RougeCallback(rouge_metric, dataset_financial['test'], tokenizer, device)])
+                  train_dataset=dataset_npc_pt["train"],
+                  eval_dataset=dataset_npc_pt["validation"],
+                  callbacks=[RougeCallback(rouge_metric, dataset_npc['test'], tokenizer, device)])
                   
 
 logging.info("Starting training on the empathic dataset")
@@ -143,7 +133,7 @@ logging.info("Training complete on the empathic dataset")
 
 # Calculate ROUGE scores after training
 score = calculate_metric_on_test_ds(
-    dataset_financial['test'], rouge_metric, trainer.model, tokenizer, batch_size=2, column_text='dialogue_text', column_summary="t0pp_prediction"
+    dataset_npc['test'], rouge_metric, trainer.model, tokenizer, batch_size=2, column_text='dialogue_text', column_summary="t0pp_prediction"
 )
 rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
 logging.info(pd.DataFrame(rouge_dict, index=[f'pegasus']))
@@ -167,9 +157,9 @@ try:
 except Exception as e:
     logging.error(f"Error saving tokenizer: {e}")
 
-# Summarization with fine-tuned model
-sample_text = dataset_financial["test"][0]["utterance"]
-reference = dataset_financial["test"][0]["summary"]
+# Summarization pipeline with fine-tuned model
+sample_text = dataset_npc["test"][0]["utterance"]
+reference = dataset_npc["test"][0]["summary"]
 gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
 
 try:

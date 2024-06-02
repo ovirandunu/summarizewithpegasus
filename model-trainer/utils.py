@@ -9,12 +9,47 @@ else:
 
 # Helper function to split data into batch-sized chunks
 def generate_batch_sized_chunks(list_of_elements, batch_size):
-    """Yield successive batch-sized chunks from list_of_elements."""
+    """
+    Generate batch-sized chunks from a given list of elements.
+
+    Args:
+        list_of_elements (list): The list of elements to generate chunks from.
+        batch_size (int): The size of each batch.
+
+    Yields:
+        list: A batch-sized chunk of elements from the input list.
+
+    Example:
+        >>> elements = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        >>> batch_size = 3
+        >>> for batch in generate_batch_sized_chunks(elements, batch_size):
+        ...     print(batch)
+        [1, 2, 3]
+        [4, 5, 6]
+        [7, 8, 9]
+        [10]
+    """
     for i in range(0, len(list_of_elements), batch_size):
         yield list_of_elements[i: i + batch_size]
 
 # Function to evaluate the summarization model on the test data
 def calculate_metric_on_test_ds(dataset, metric, model, tokenizer, batch_size=8, device=device, column_text="utterance", column_summary="summary"):
+    """
+    Calculates a metric on a test dataset using a given model and tokenizer.
+
+    Args:
+        dataset (pandas.DataFrame): The test dataset.
+        metric: The metric object used to evaluate the model's performance.
+        model: The trained model.
+        tokenizer: The tokenizer used to preprocess the input data.
+        batch_size (int, optional): The batch size for inference. Defaults to 8.
+        device (str, optional): The device to run the model on. Defaults to 'cuda' if available, else 'cpu'.
+        column_text (str, optional): The column name in the dataset that contains the input text. Defaults to "utterance".
+        column_summary (str, optional): The column name in the dataset that contains the target summaries. Defaults to "summary".
+
+    Returns:
+        The computed score of the metric on the test dataset.
+    """
     model.eval()
     article_batches = list(generate_batch_sized_chunks(dataset[column_text], batch_size))
     target_batches = list(generate_batch_sized_chunks(dataset[column_summary], batch_size))
@@ -36,3 +71,5 @@ def calculate_metric_on_test_ds(dataset, metric, model, tokenizer, batch_size=8,
 
     score = metric.compute()
     return score
+
+

@@ -26,13 +26,16 @@ logging.basicConfig(level=logging.INFO,
                         logging.StreamHandler()
                     ])
 
+# download nltk punkt for tokenization
 nltk.download("punkt")
 
-# Check GPU availability
+# Check GPU availability and assign device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info(f"Device set to {device}")
 
-# Load the relevant model
+# Load the relevant model. 
+# Checkpoints available for this pipeline: 
+# google/pegasus-cnn_dailymail, ~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model-2
 model_ckpt = "google/pegasus-cnn_dailymail"
 logging.info(f"Loading model and tokenizer from checkpoint {model_ckpt}")
 tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
@@ -75,26 +78,6 @@ rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
 dataframe_rouge = pd.DataFrame(rouge_dict, index=['pegasus'])
 logging.info(dataframe_rouge)
 
-# Token length histograms
-prompt_token_len = [len(tokenizer.encode(s)) for s in dataset_empathic['train']['prompt']]
-summary_token_len = [len(tokenizer.encode(s)) for s in dataset_empathic['train']['summary']]
-
-fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-axes[0].hist(prompt_token_len, bins=20, color='C0', edgecolor='C0')
-axes[0].set_title("Utterance Token Length")
-axes[0].set_xlabel("Length")
-axes[0].set_ylabel("Count")
-axes[1].hist(summary_token_len, bins=20, color='C0', edgecolor='C0')
-axes[1].set_title("Summary Token Length")
-axes[1].set_xlabel("Length")
-plt.tight_layout()
-plt.show()
-
-# save plot to empathetic folder
-try:
-    plt.savefig('empathetic/token_histogram.png')
-except Exception as e:
-    logging.error(f"Error saving token histogram plot: {e}")
 
 # Convert examples to features
 def convert_examples_to_features(example_batch):
@@ -112,28 +95,36 @@ def convert_examples_to_features(example_batch):
         'labels': target_encodings['input_ids']
     }
 
-# Tokenize and collate data
+# Tokenize and encode the dataset
 dataset_empathic_pt = dataset_empathic.map(convert_examples_to_features, batched=True)
 seq2seq_data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_pegasus)
 
 # Training arguments
 logging.info("Setting up training arguments")
 trainer_args = TrainingArguments(
+    # directory for saving checkpoints
     output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/empathetic'),
-    num_train_epochs=4,
+    # total number of training epochs
+    num_train_epochs=6,
+    # number of warmup steps for learning rate scheduler
     warmup_steps=500,
+    # batch size for training
     per_device_train_batch_size=4,
+    # batch size for evaluation
     per_device_eval_batch_size=4,
+    # decay rate for learning rate
     weight_decay=0.01,
-    logging_steps=10,
-    evaluation_strategy='steps',
+    # evaluate at every 500 steps
     eval_steps=500,
+    evaluation_strategy='steps',
+    # save at every epoch
     save_strategy='epoch',
-    gradient_accumulation_steps=16
+    # optimize gpu memory usage with gradient accumulation
+    gradient_accumulation_steps=16,
 )
 logging.info(f"Training arguments: {trainer_args}")
 
-# Trainer
+# Trainer initialization
 logging.info("Initialising trainer")
 trainer = Trainer(model=model_pegasus, args=trainer_args,
                   tokenizer=tokenizer, data_collator=seq2seq_data_collator,
@@ -170,7 +161,7 @@ try:
 except Exception as e:
     logging.error(f"Error saving tokenizer: {e}")
 
-# Summarization with fine-tuned model
+# Summarization pipeline with fine-tuned model
 sample_text = dataset_empathic["test"][0]["prompt"]
 reference = dataset_empathic["test"][0]["summary"]
 gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
