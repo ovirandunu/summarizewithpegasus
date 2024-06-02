@@ -1,16 +1,16 @@
 # Investigating Dialogue Summarization with Pegasus
 
-![https://img.shields.io/badge/License-MIT-blue.svg](https://img.shields.io/badge/License-MIT-blue.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/downloads/release/python-370/)
+[![HuggingFace Transformers](https://img.shields.io/badge/Transformers-4.5.1-green)](https://github.com/huggingface/transformers)
 
-![https://img.shields.io/badge/python-3.7%2B-blue.svg](https://img.shields.io/badge/python-3.7%2B-blue.svg)
-
-[https://img.shields.io/badge/Transformers-4.5.1-green](https://img.shields.io/badge/Transformers-4.5.1-green)
 
 ## Authors
 
-- https://www.github.com/ovirandunu
-- https://www.github.com/cdomenechfarre
-- https://www.github.com/laurexh77
+- **Ovindu Chakrawarthige** - [GitHub](https://www.github.com/ovirandunu)
+- **Clàudia Domènech Farré** - [GitHub](https://www.github.com/cdomenechfarre)
+- **Laure Hajislam** - [GitHub](https://www.github.com/laurexh77)
+
 
 ## Abstract
 
