@@ -7,9 +7,10 @@
 
 ## Authors
 
-- https://www.github.com/ovirandunu
-- https://www.github.com/cdomenechfarre
-- https://www.github.com/laurexh77
+- **Ovindu Chakrawarthige** - [GitHub](https://www.github.com/ovirandunu)
+- **Clàudia Domènech Farré** - [GitHub](https://www.github.com/cdomenechfarre)
+- **Laure Hajislam** - [GitHub](https://www.github.com/laurexh77)
+
 
 ## Abstract
 
