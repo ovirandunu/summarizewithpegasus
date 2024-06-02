@@ -35,7 +35,7 @@ The datasets were chosen for their diversity in dialogue types, ensuring a compr
 ### Division of Tasks
 
 - **Ovindu**: Integrate and modularize code.
-- **Clàudia**: Compile information and insights, write the report.
+- **Clàudia**: Compile information and insights, started writing the report.
 - **Laure**: Conduct statistical tests, analyze results.
 
 ## Documentation
