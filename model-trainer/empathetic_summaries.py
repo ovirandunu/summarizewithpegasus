@@ -54,21 +54,21 @@ dataset_empathic = load_dataset("jtatman/empathetic_dialogues_summary", split=tr
 logging.info(f"Split lengths: {[len(dataset_empathic[split]) for split in dataset_empathic]}")
 logging.info(f"Features: {dataset_empathic['train'].column_names}")
 
-# Logging a sample utterance and summary
+# Logging a sample prompt and summary
 logging.info("\nUtterance:")
-logging.info(dataset_empathic["test"][1]["utterance"])
+logging.info(dataset_empathic["test"][1]["prompt"])
 logging.info("\nSummary:")
 logging.info(dataset_empathic["test"][1]["summary"])
 
 # Summarization pipeline
 pipe = pipeline('summarization', model=model_ckpt)
-pipe_out = pipe(dataset_empathic['test'][0]['utterance'])
+pipe_out = pipe(dataset_empathic['test'][0]['prompt'])
 logging.info(pipe_out)
 logging.info(pipe_out[0]['summary_text'].replace(" .", ".\n"))
 
 # Calculate ROUGE scores
 rouge_metric = load_metric('rouge')
-score = calculate_metric_on_test_ds(dataset_empathic['test'], rouge_metric, model_pegasus, tokenizer, column_text='utterance', column_summary='summary', batch_size=8)
+score = calculate_metric_on_test_ds(dataset_empathic['test'], rouge_metric, model_pegasus, tokenizer, column_text='prompt', column_summary='summary', batch_size=8)
 
 rouge_names = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
 rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
@@ -76,11 +76,11 @@ dataframe_rouge = pd.DataFrame(rouge_dict, index=['pegasus'])
 logging.info(dataframe_rouge)
 
 # Token length histograms
-utterance_token_len = [len(tokenizer.encode(s)) for s in dataset_empathic['train']['utterance']]
+prompt_token_len = [len(tokenizer.encode(s)) for s in dataset_empathic['train']['prompt']]
 summary_token_len = [len(tokenizer.encode(s)) for s in dataset_empathic['train']['summary']]
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-axes[0].hist(utterance_token_len, bins=20, color='C0', edgecolor='C0')
+axes[0].hist(prompt_token_len, bins=20, color='C0', edgecolor='C0')
 axes[0].set_title("Utterance Token Length")
 axes[0].set_xlabel("Length")
 axes[0].set_ylabel("Count")
@@ -98,7 +98,7 @@ except Exception as e:
 
 # Convert examples to features
 def convert_examples_to_features(example_batch):
-    input_encodings = tokenizer(example_batch['utterance'], max_length=1024, truncation=True)
+    input_encodings = tokenizer(example_batch['prompt'], max_length=1024, truncation=True)
 
     with tokenizer.as_target_tokenizer():
         target_encodings = tokenizer(example_batch['summary'], max_length=128, truncation=True)
@@ -146,7 +146,7 @@ logging.info("Training complete on the empathic dataset")
 
 # Calculate ROUGE scores after training
 score = calculate_metric_on_test_ds(
-    dataset_empathic['test'], rouge_metric, trainer.model, tokenizer, batch_size=2, column_text='utterance', column_summary='summary'
+    dataset_empathic['test'], rouge_metric, trainer.model, tokenizer, batch_size=2, column_text='prompt', column_summary='summary'
 )
 rouge_dict = dict((rn, score[rn].mid.fmeasure) for rn in rouge_names)
 logging.info(pd.DataFrame(rouge_dict, index=[f'pegasus']))
@@ -171,7 +171,7 @@ except Exception as e:
     logging.error(f"Error saving tokenizer: {e}")
 
 # Summarization with fine-tuned model
-sample_text = dataset_empathic["test"][0]["utterance"]
+sample_text = dataset_empathic["test"][0]["prompt"]
 reference = dataset_empathic["test"][0]["summary"]
 gen_kwargs = {"length_penalty": 0.8, "num_beams": 8, "max_length": 128}
 
