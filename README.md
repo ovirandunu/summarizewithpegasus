@@ -1,13 +1,9 @@
 # Investigating Dialogue Summarization with Pegasus
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/travis/com/<username>/<repository>.svg)](https://travis-ci.com/github/<username>/<repository>)
 [![Python Version](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/downloads/release/python-370/)
 [![HuggingFace Transformers](https://img.shields.io/badge/Transformers-4.5.1-green)](https://github.com/huggingface/transformers)
-[![Downloads](https://pepy.tech/badge/<repository>)](https://pepy.tech/project/<repository>)
-[![Issues](https://img.shields.io/github/issues/<username>/<repository>.svg)](https://github.com/<username>/<repository>/issues)
-[![Forks](https://img.shields.io/github/forks/<username>/<repository>.svg)](https://github.com/<username>/<repository>/network/members)
-[![Stars](https://img.shields.io/github/stars/<username>/<repository>.svg)](https://github.com/<username>/<repository>/stargazers)
+
 
 ## Authors
 
