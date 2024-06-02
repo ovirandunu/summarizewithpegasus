@@ -17,7 +17,6 @@ from transformers import (
 from datasets import load_dataset, load_metric
 import logging
 from utils import calculate_metric_on_test_ds
-from sklearn.model_selection import train_test_split
 
 # Setup logging
 logging.basicConfig(level=logging.INFO,
@@ -27,7 +26,6 @@ logging.basicConfig(level=logging.INFO,
                         logging.StreamHandler()
                     ])
 
-
 nltk.download("punkt")
 
 # Check GPU availability
@@ -35,7 +33,6 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info(f"Device set to {device}")
 
 # Load the relevant model
-# checkpoints available for this pipeline: google/pegasus-cnn_dailymail, ~/tm/tmgp/model-trainer/checkpoints/pegasus-samsum-model-2
 model_ckpt = "google/pegasus-cnn_dailymail"
 logging.info(f"Loading model and tokenizer from checkpoint {model_ckpt}")
 tokenizer = AutoTokenizer.from_pretrained(model_ckpt)
@@ -46,19 +43,13 @@ logging.info(f"Model loaded: {model_pegasus}")
 logging.info("Loading empathetic_dialogues_summary dataset")
 dataset_empathic = load_dataset("jtatman/empathetic_dialogues_summary")
 
-# Splitting the dataset into train, validation, and test sets
-train_test_split_ratio = 0.1
-train_valid_split_ratio = 0.1
-
-train_valid, test = train_test_split(dataset_empathic['train'], test_size=train_test_split_ratio, random_state=42)
-train, validation = train_test_split(train_valid, test_size=train_valid_split_ratio, random_state=42)
-
-# refactor dataset into a dictionary
-dataset_empathic = {
-    "train": train,
-    "validation": validation,
-    "test": test
+# Splitting the dataset into train, validation, and test sets using the slicing API
+train_valid_test_split = {
+    'train': 'train[:80%]',
+    'validation': 'train[80%:90%]',
+    'test': 'train[90%:]'
 }
+dataset_empathic = load_dataset("jtatman/empathetic_dialogues_summary", split=train_valid_test_split)
 
 logging.info(f"Split lengths: {[len(dataset_empathic[split]) for split in dataset_empathic]}")
 logging.info(f"Features: {dataset_empathic['train'].column_names}")
@@ -124,7 +115,6 @@ def convert_examples_to_features(example_batch):
 # Tokenize and collate data
 dataset_empathic_pt = dataset_empathic.map(convert_examples_to_features, batched=True)
 seq2seq_data_collator = DataCollatorForSeq2Seq(tokenizer, model=model_pegasus)
-
 
 # Training arguments
 logging.info("Setting up training arguments")
