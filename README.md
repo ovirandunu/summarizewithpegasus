@@ -120,7 +120,6 @@ Key training configurations include:
 ### Example Configuration in `trainer.py`:
 
 ```python
-pythonCopy code
 trainer_args = TrainingArguments(
     output_dir=os.path.expanduser('~/tm/tmgp/model-trainer/checkpoints'),  # Directory for saving checkpoints
     num_train_epochs=6,  # Total number of training epochs
